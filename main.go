@@ -41,7 +41,8 @@ func handleRequests(){
 	router.HandleFunc("/login", login).Methods("POST")
 	router.HandleFunc("/logout", AuthMiddleware(logout)).Methods("GET")
 	router.HandleFunc("/add_bookmark", AuthMiddleware(AddBookmark)).Methods("POST")
-	router.HandleFunc("/update_bookmark", AuthMiddleware(UpdateBookmark)).Methods("POST")
+	router.HandleFunc("/update_bookmark", AuthMiddleware(UpdateBookmark)).Methods("PUT")
+	router.HandleFunc("/delete_tag", AuthMiddleware(DeleteTag)).Methods("DELETE")
 	router.HandleFunc("/list_bookmarks", AuthMiddleware(ListBookmarks)).Methods("GET")
 	log.Fatal(http.ListenAndServe(":10000", router))
 }
@@ -183,39 +184,50 @@ func AddBookmark( w http.ResponseWriter, r *http.Request){
 }
 func UpdateBookmark(w http.ResponseWriter, r *http.Request){
 	fmt.Println("update bookmark service hit")
-	action := r.FormValue("action")
 	url := r.FormValue("url")
 	tagname := r.FormValue("tagname")
-	fmt.Println(tagname,url)
 	username := getUserName(w,r)
 	userId := retrieveUserId(username)
 	if userId != 0 {
 		bookmarkId := retrieveBookmarkId(url, userId)
-		if action == "add" {
-			res, _ := database.Exec("INSERT OR IGNORE INTO tags(name) VALUES(?)",tagname)
-			if res != nil {}
-			var tagId int
-			err := database.QueryRow("SELECT  id from tags WHERE  name=$1",tagname).Scan(&tagId)
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(tagId,bookmarkId)
+		res, _ := database.Exec("INSERT OR IGNORE INTO tags(name) VALUES(?)",tagname)
+		if res != nil {}
+		var tagId int
+		err := database.QueryRow("SELECT  id from tags WHERE  name=$1",tagname).Scan(&tagId)
+		if err != nil {
 			fmt.Println(err)
-			res2, _ := database.Exec("INSERT INTO tag_bookmark(tagid,bookmarkid) VALUES(?,?)",tagId,bookmarkId)
-			if res2 != nil {}
-			fmt.Fprintf(w, "tag added")
-		} else if action == "delete" {
-			fmt.Println("deleting tag from bookmark")
-			var tagId int
-			err := database.QueryRow("SELECT  id from tags WHERE  name=$1",tagname).Scan(&tagId)
-			fmt.Println(tagId,bookmarkId)
-			if err != nil {}
-			res2, _ := database.Exec("DELETE FROM tag_bookmark WHERE tagid=$1 AND bookmarkId=$2",tagId,bookmarkId)
-			fmt.Println(res2)
 		}
+		fmt.Println(tagId,bookmarkId)
+		fmt.Println(err)
+		res2, _ := database.Exec("INSERT INTO tag_bookmark(tagid,bookmarkid) VALUES(?,?)",tagId,bookmarkId)
+		if res2 != nil {}
+		fmt.Fprintf(w, "tag added")
 	}else {
 		fmt.Fprintf(w, "password incorrect")
 	}
+}
+func DeleteTag(w http.ResponseWriter, r *http.Request){
+	fmt.Println("deleting tag from bookmark")
+	fmt.Println(r)
+	tagname := r.URL.Query().Get("tag")
+	url :=  r.URL.Query().Get("url")
+	//url := r.FormValue("url")
+	//tagname := r.FormValue("tagname")
+	fmt.Println(url,tagname)
+	username := getUserName(w,r)
+	userId := retrieveUserId(username)
+	if userId != 0 {
+		bookmarkId := retrieveBookmarkId(url, userId)
+		var tagId int
+		err := database.QueryRow("SELECT  id from tags WHERE  name=$1", tagname).Scan(&tagId)
+		if err != nil {
+			fmt.Println(err)
+		}
+		res2, _ := database.Exec("DELETE FROM tag_bookmark WHERE tagid=$1 AND bookmarkId=$2", tagId, bookmarkId)
+		fmt.Println(res2)
+		fmt.Fprintf(w, "tag deleted")
+	}
+
 }
 func ListBookmarks(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("ListBookmarks service hit")
