@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Bookmark Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" media="screen" href="main.css" />
+    <script src="main.js"></script>
+</head>
+{{if .Authenticated }}
+<body onload="loadHomePage()">
+{{else}}
+<body >
+{{end}}
+<h1>Bookmark Manager</h1>
+{{if .Authenticated }}
+    <p>Welcome back! {{.Username}}</p>
+    <a href="/logout">Logout</a>
+    <br> <br> <br>
+    <p><a href="/">Clear Filters</a></p><div id="tags"></div>
+    <br> <br>
+    <table id="bookmarks">
+    </table>
+    <form action="/add_bookmark" method="POST">
+        <input type="text" name="url" placeholder="">
+        <input type="submit" value="Add Bookmark">
+    </form>
+{{end}}
+{{ if not .Authenticated }}
+    <p>Please login to manage your bookmarks.</p>
+    <form action="/login" method="POST">
+        <input type="text" name="username" placeholder="username">
+        <input type="password" name="password" placeholder="password" required>
+        <input type="submit" value="Submit">
+    </form>
+    <p>If it's your first time here, please signup.</p>
+    <form action="/add_user" method="POST">
+        <input type="text" name="username" placeholder="username">
+        <input type="password" name="password" placeholder="password" required>
+        <input type="submit" value="Submit">
+    </form>
+{{ end }}
+<script>
+    function cleanBookmarksOnScreen(){
+        var elem = document.getElementById("bookmarks");
+        elem.innerHTML = "";
+    }
+    function filterTag(d){
+        loadHomePage(d.id);
+    }
+    function addUrl(d) {
+        var url = d.getAttribute('data-url');
+        var request = new XMLHttpRequest();
+        request.open("POST", '/add_bookmark', true);
+        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        request.send('url='+url);
+        location.reload();
+    }
+    function addTag(d) {
+        var url = d.getAttribute('data-url');
+        var newTag =  document.getElementById(url).value;
+        var request = new XMLHttpRequest();
+        request.open("POST", '/update_bookmark', true);
+        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        request.send('action=add&url='+url+'&tagname='+newTag);
+        location.reload();
+    }
+    function deleteTag(d) {
+        var url = d.getAttribute('data-url');
+        var tag =  d.getAttribute('data-tag');
+        var request = new XMLHttpRequest();
+        request.open("POST", '/update_bookmark', true);
+        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        request.send('action=delete&url='+url+'&tagname='+tag);
+        location.reload();
+    }
+
+    document.getElementById("bookmarks").innerHTML = "We will populate the bookmarks here.";
+    //alert( document.cookie);
+    function loadHomePage(tag){
+        cleanBookmarksOnScreen();
+        var request = new XMLHttpRequest();
+        var url = 'http://localhost:10000/list_bookmarks'
+        if (tag) {
+            url +='?tags='+tag;
+        }
+        request.open('GET',url, true);
+        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        request.setRequestHeader('Accept', 'application/json');
+        request.send();
+        request.onreadystatechange = function () {
+            if (request.readyState !== 4) {
+                return;
+            }
+            //var taglist = [];
+            var tagSet = new Set([]);
+            bookmarks = JSON.parse(request.responseText);
+            for (var i = 0; i < bookmarks.length; i++) {
+                var parenttbl = document.getElementById("bookmarks");
+                var newel = document.createElement('tr');
+                newel.setAttribute('id', newel);
+                newel.innerHTML =  bookmarks[i].url + '&nbsp; '
+                for (var j=0; j < bookmarks[i].tagName.length; j++){
+                    tagSet.add(bookmarks[i].tagName[j]);
+                    newel.insertAdjacentHTML( 'beforeend', '['+bookmarks[i].tagName[j]+']'+ '&nbsp; '+
+                        '<button data-tag=' + bookmarks[i].tagName[j] + ' data-url='+bookmarks[i].url+
+                        '  onclick="deleteTag(this)">delete Tag</button> &nbsp; ' )
+                }
+                newel.insertAdjacentHTML( 'beforeend', '<input id='+bookmarks[i].url+
+                    '  size="5" type="text" name="tag" placeholder=""/>'
+                    +'<button data-url='+bookmarks[i].url+ '  onclick="addTag(this)">Add Tag</button>');
+                parenttbl.appendChild(newel);
+            }
+            taglist =  Array.from(tagSet);
+            var parentTag = document.getElementById('tags');
+            parentTag.innerHTML = 'click to filter by tag: ';
+            for (var i = 0; i < taglist.length; i++) {
+                var tagButton = document.createElement('BUTTON');
+                tagButton.setAttribute('id', taglist[i]);
+                tagButton.innerHTML =taglist[i];
+                tagButton.setAttribute( "onClick", "filterTag(this)" );
+                parentTag.appendChild(tagButton);
+            }
+    }
+    window.onload = function () {
+        if (localStorage.getItem("hasCodeRunBefore") === null) {
+            loadHomePage("");
+            localStorage.setItem("hasCodeRunBefore", true);
+        }
+    }
+    };
+</script>
+</body>
+</html>
